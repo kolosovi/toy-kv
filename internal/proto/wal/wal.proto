@@ -1,0 +1,23 @@
+syntax = "proto3";
+package toy_kv.internal.wal;
+option go_package = "internal/pb/wal";
+
+message KV {
+    bytes k = 1;
+    bytes v = 2;
+}
+
+message Insert {
+    KV kv = 1;
+}
+
+message Delete {
+    bytes k = 1;
+}
+
+message Log {
+    oneof log {
+        Insert insert = 1;
+        Delete delete = 2;
+    }
+}

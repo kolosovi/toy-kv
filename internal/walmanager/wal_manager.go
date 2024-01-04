@@ -2,6 +2,7 @@ package walmanager
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"os"
 
@@ -47,17 +48,25 @@ func (m *WALManager) Stop() error {
 }
 
 func (m *WALManager) WriteInsert(i Insert) error {
-	dto := &wal.Insert{
-		Kv: &wal.KV{
-			K: []byte(i.K),
-			V: []byte(i.V),
+	dto := &wal.Log{
+		Log: &wal.Log_Insert{
+			Insert: &wal.Insert{
+				Kv: &wal.KV{
+					K: []byte(i.K),
+					V: []byte(i.V),
+				},
+			},
 		},
 	}
 	return m.writeLog(dto)
 }
 
 func (m *WALManager) WriteDelete(i Delete) error {
-	dto := &wal.Delete{K: []byte(i.K)}
+	dto := &wal.Log{
+		Log: &wal.Log_Delete{
+			Delete: &wal.Delete{K: []byte(i.K)},
+		},
+	}
 	return m.writeLog(dto)
 }
 
@@ -66,7 +75,7 @@ func (m *WALManager) writeLog(log protoreflect.ProtoMessage) error {
 	if err != nil {
 		return fmt.Errorf("cannot marshal log: %w", err)
 	}
-	buf := make([]byte, sizeofLogSize + len(logBytes))
+	buf := make([]byte, sizeofLogSize+len(logBytes))
 	binary.LittleEndian.PutUint32(buf, uint32(len(logBytes)))
 	copy(buf[sizeofLogSize:], logBytes)
 	for len(buf) != 0 {
@@ -82,11 +91,25 @@ func (m *WALManager) writeLog(log protoreflect.ProtoMessage) error {
 const sizeofLogSize = 4
 
 func (m *WALManager) Reader() (WALReader, error) {
-	return &reader{}, nil
+	f, err := os.OpenFile(
+		m.config.walFilename,
+		os.O_RDONLY,
+		0,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("cannot open WAL file for reading: %w", err)
+	}
+	r, err := newReader(f)
+	if err != nil {
+		return nil, fmt.Errorf("newReader: %w", err)
+	}
+	return r, nil
 }
 
 type WALReader interface {
 	HasNext() bool
 	Scan(log *Log) error
-	Err() error
+	Close() error
 }
+
+var ErrNoLogs = errors.New("no more logs")

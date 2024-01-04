@@ -8,19 +8,43 @@ import (
 )
 
 type DAO struct {
-	index map[toykv.K]toykv.V
+	index      map[toykv.K]toykv.V
 	walManager *walmanager.WALManager
 }
 
 func New(walManager *walmanager.WALManager) *DAO {
 	return &DAO{
-		index: make(map[toykv.K]toykv.V, 0),
+		index:      make(map[toykv.K]toykv.V, 0),
 		walManager: walManager,
 	}
 }
 
 func (d *DAO) Start() error {
-	return d.walManager.Start()
+	if err := d.walManager.Start(); err != nil {
+		return fmt.Errorf("walManager.Start: %w", err)
+	}
+	r, err := d.walManager.Reader()
+	if err != nil {
+		return fmt.Errorf("walmanager.Reader: %w", err)
+	}
+	defer r.Close()
+	for r.HasNext() {
+		var log walmanager.Log
+		if err := r.Scan(&log); err != nil {
+			return fmt.Errorf("r.Scan: %w", err)
+		}
+		d.applyLog(log)
+	}
+	return nil
+}
+
+func (d *DAO) applyLog(log walmanager.Log) {
+	switch log.Typ {
+	case walmanager.LogTypeInsert:
+		d.index[log.Insert.K] = log.Insert.V
+	case walmanager.LogTypeDelete:
+		delete(d.index, log.Delete.K)
+	}
 }
 
 func (d *DAO) Stop() error {

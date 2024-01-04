@@ -46,6 +46,19 @@ func TestOperations(t *testing.T) {
 	require.ErrorIs(t, err, toykv.ErrNotFound, "not ErrNotFound: %v", err)
 }
 
+func TestReproduce(t *testing.T) {
+	t.Skip()
+	dao := New(walmanager.New(walmanager.WithWALFilename("test_4022139208788608928")))
+	require.NoError(t, dao.Start())
+	t.Cleanup(func() {
+		require.NoError(t, dao.Stop())
+	})
+
+	v, err := dao.Get("foo")
+	require.NoError(t, err)
+	require.Equal(t, toykv.V("foo_value"), v)
+}
+
 func TestPersistence(t *testing.T) {
 	var walFilename = newFilename()
 	t.Run("record must be persisted to disk", func(t *testing.T) {
@@ -55,7 +68,10 @@ func TestPersistence(t *testing.T) {
 			require.NoError(t, dao.Stop())
 		})
 
+		require.NoError(t, dao.Put(toykv.Record{K: "foo", V: "foo_value_old"}))
 		require.NoError(t, dao.Put(toykv.Record{K: "foo", V: "foo_value"}))
+		require.NoError(t, dao.Put(toykv.Record{K: "bar", V: "bar_value"}))
+		require.NoError(t, dao.Delete("bar"))
 	})
 
 	t.Run("must be able to read persisted record", func(t *testing.T) {
@@ -68,10 +84,14 @@ func TestPersistence(t *testing.T) {
 		v, err := dao.Get("foo")
 		require.NoError(t, err)
 		require.Equal(t, toykv.V("foo_value"), v)
+
+		_, err = dao.Get("bar")
+		require.ErrorIs(t, err, toykv.ErrNotFound, "not ErrNotFound: %v", err)
 	})
 }
 
 var filenames []string
+
 const filenamePattern = "test_%d"
 
 func newFilename() string {
@@ -83,7 +103,7 @@ func newFilename() string {
 func TestMain(m *testing.M) {
 	mainSetup()
 	code := m.Run()
-	// mainTeardown()
+	mainTeardown()
 	os.Exit(code)
 }
 

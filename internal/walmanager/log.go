@@ -11,7 +11,7 @@ type Delete struct {
 }
 
 type Log struct {
-	typ LogType
+	Typ LogType
 	Insert
 	Delete
 }

@@ -99,6 +99,9 @@ func (m *WALManager) writeLog(log protoreflect.ProtoMessage) error {
 		}
 		buf = buf[n:]
 	}
+	if err = m.f.Sync(); err != nil {
+		return fmt.Errorf("WAL file sync: %w", err)
+	}
 	return nil
 }
 

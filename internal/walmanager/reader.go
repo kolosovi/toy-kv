@@ -1,6 +1,7 @@
 package walmanager
 
 import (
+	"bufio"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -13,12 +14,19 @@ import (
 
 type reader struct {
 	f           *os.File
+	r           *bufio.Reader
 	buf         []byte
 	nextLogSize int
 }
 
+const readBufSize = 1024 * 1024
+
 func newReader(f *os.File) (*reader, error) {
-	r := &reader{f: f, buf: []byte{}}
+	r := &reader{
+		f:   f,
+		r:   bufio.NewReaderSize(f, readBufSize),
+		buf: []byte{},
+	}
 	if err := r.peek(); err != nil {
 		return nil, fmt.Errorf("peek: %w", err)
 	}
@@ -47,7 +55,7 @@ func (r *reader) Scan(log *Log) error {
 	r.ensureBufLength(r.nextLogSize)
 	dst := r.buf[:r.nextLogSize]
 	for len(dst) > 0 {
-		readCount, err := r.f.Read(dst)
+		readCount, err := r.r.Read(dst)
 		dst = dst[readCount:]
 		if err == io.EOF {
 			break
@@ -91,7 +99,7 @@ func (r *reader) peek() error {
 	r.ensureBufLength(sizeofLogSize)
 	dst := r.buf[:sizeofLogSize]
 	for len(dst) > 0 {
-		readCount, err := r.f.Read(dst)
+		readCount, err := r.r.Read(dst)
 		dst = dst[readCount:]
 		if err == io.EOF {
 			break

@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/kolosovi/toy-kv"
 	"github.com/kolosovi/toy-kv/internal/walmanager"
@@ -46,27 +47,12 @@ func TestOperations(t *testing.T) {
 	require.ErrorIs(t, err, toykv.ErrNotFound, "not ErrNotFound: %v", err)
 }
 
-func TestReproduce(t *testing.T) {
-	t.Skip()
-	dao := New(walmanager.New(walmanager.WithWALFilename("test_4022139208788608928")))
-	require.NoError(t, dao.Start())
-	t.Cleanup(func() {
-		require.NoError(t, dao.Stop())
-	})
-
-	v, err := dao.Get("foo")
-	require.NoError(t, err)
-	require.Equal(t, toykv.V("foo_value"), v)
-}
-
 func TestPersistence(t *testing.T) {
 	var walFilename = newFilename()
 	t.Run("record must be persisted to disk", func(t *testing.T) {
 		dao := New(walmanager.New(walmanager.WithWALFilename(walFilename)))
 		require.NoError(t, dao.Start())
-		t.Cleanup(func() {
-			require.NoError(t, dao.Stop())
-		})
+		t.Cleanup(func() { require.NoError(t, dao.Stop()) })
 
 		require.NoError(t, dao.Put(toykv.Record{K: "foo", V: "foo_value_old"}))
 		require.NoError(t, dao.Put(toykv.Record{K: "foo", V: "foo_value"}))
@@ -87,6 +73,38 @@ func TestPersistence(t *testing.T) {
 
 		_, err = dao.Get("bar")
 		require.ErrorIs(t, err, toykv.ErrNotFound, "not ErrNotFound: %v", err)
+	})
+}
+
+func TestStress(t *testing.T) {
+	var walFilename = newFilename()
+	const numGenerations = 10
+	const numKeys = 100
+
+	t.Run("populate storage", func(t *testing.T) {
+		dao := New(walmanager.New(walmanager.WithWALFilename(walFilename)))
+		require.NoError(t, dao.Start())
+		t.Cleanup(func() { require.NoError(t, dao.Stop()) })
+		for iter := 0; iter < numGenerations; iter++ {
+			for i := 0; i < numKeys; i++ {
+				key := toykv.K(fmt.Sprintf("key_%d", i))
+				value := toykv.V(fmt.Sprintf("value_%d", i))
+				require.NoError(t, dao.Put(toykv.Record{K: key, V: value}))
+			}
+		}
+	})
+
+	t.Run("startup", func(t *testing.T) {
+		dao := New(walmanager.New(walmanager.WithWALFilename(walFilename)))
+		startedAt := time.Now()
+		require.NoError(t, dao.Start())
+		t.Cleanup(func() { require.NoError(t, dao.Stop()) })
+		startupDuration := time.Since(startedAt)
+		require.Lessf(
+			t,
+			startupDuration, time.Second,
+			"startup duration is %v > %v", startupDuration, time.Second,
+		)
 	})
 }
 

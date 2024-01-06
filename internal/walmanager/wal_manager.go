@@ -39,7 +39,7 @@ func New(opts ...Option) *WALManager {
 func (m *WALManager) Start() (err error) {
 	m.f, err = os.OpenFile(
 		m.config.walFilename,
-		os.O_RDWR|os.O_CREATE,
+		os.O_RDWR|os.O_CREATE|os.O_APPEND,
 		os.FileMode(0644),
 	)
 	if err != nil {

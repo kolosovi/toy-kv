@@ -60,20 +60,37 @@ func TestPersistence(t *testing.T) {
 		require.NoError(t, dao.Delete("bar"))
 	})
 
-	t.Run("must be able to read persisted record", func(t *testing.T) {
+	t.Run("must be able to read persisted records and add new ones", func(t *testing.T) {
 		dao := New(walmanager.New(walmanager.WithWALFilename(walFilename)))
 		require.NoError(t, dao.Start())
-		t.Cleanup(func() {
-			require.NoError(t, dao.Stop())
-		})
+		t.Cleanup(func() { require.NoError(t, dao.Stop()) })
 
-		v, err := dao.Get("foo")
-		require.NoError(t, err)
-		require.Equal(t, toykv.V("foo_value"), v)
+		assertKeyExists(t, dao, "foo", "foo_value")
+		assertKeyNotFound(t, dao, "bar")
 
-		_, err = dao.Get("bar")
-		require.ErrorIs(t, err, toykv.ErrNotFound, "not ErrNotFound: %v", err)
+		require.NoError(t, dao.Put(toykv.Record{K: "baz", V: "baz_value"}))
 	})
+
+	t.Run("must be able to read records added in all previous runs", func(t *testing.T) {
+		dao := New(walmanager.New(walmanager.WithWALFilename(walFilename)))
+		require.NoError(t, dao.Start())
+		t.Cleanup(func() { require.NoError(t, dao.Stop()) })
+
+		assertKeyExists(t, dao, "foo", "foo_value")
+		assertKeyNotFound(t, dao, "bar")
+		assertKeyExists(t, dao, "baz", "baz_value")
+	})
+}
+
+func assertKeyExists(t *testing.T, dao *DAO, key, expectedValue string) {
+	actualValue, err := dao.Get(toykv.K(key))
+	require.NoError(t, err)
+	require.Equal(t, toykv.V(expectedValue), actualValue)
+}
+
+func assertKeyNotFound(t *testing.T, dao *DAO, key string) {
+	_, err := dao.Get("bar")
+	require.ErrorIs(t, err, toykv.ErrNotFound, "not ErrNotFound: %v", err)
 }
 
 func TestStress(t *testing.T) {

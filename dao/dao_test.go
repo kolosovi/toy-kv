@@ -20,29 +20,23 @@ func TestOperations(t *testing.T) {
 	})
 
 	// No keys, Get & Delete must return ErrNotFound
-	_, err := dao.Get("foo")
-	require.ErrorIs(t, err, toykv.ErrNotFound, "not ErrNotFound: %v", err)
-	err = dao.Delete("foo")
+	assertKeyNotFound(t, dao, "foo")
+	err := dao.Delete("foo")
 	require.ErrorIs(t, err, toykv.ErrNotFound, "not ErrNotFound: %v", err)
 
 	// After Put, Get must return inserted value
 	require.NoError(t, dao.Put(toykv.Record{K: "foo", V: "foo_value"}))
-	v, err := dao.Get("foo")
-	require.NoError(t, err)
-	require.Equal(t, toykv.V("foo_value"), v)
+	assertKeyExists(t, dao, "foo", "foo_value")
 
 	// After second Put, Get must return updated value
 	require.NoError(t, dao.Put(toykv.Record{K: "foo", V: "foo_value_new"}))
-	v, err = dao.Get("foo")
-	require.NoError(t, err)
-	require.Equal(t, toykv.V("foo_value_new"), v)
+	assertKeyExists(t, dao, "foo", "foo_value_new")
 
 	// Delete must return no error
 	require.NoError(t, dao.Delete("foo"))
 
 	// After Delete, Get and Delete of the same key must return ErrNotFound
-	_, err = dao.Get("foo")
-	require.ErrorIs(t, err, toykv.ErrNotFound, "not ErrNotFound: %v", err)
+	assertKeyNotFound(t, dao, "foo")
 	err = dao.Delete("foo")
 	require.ErrorIs(t, err, toykv.ErrNotFound, "not ErrNotFound: %v", err)
 }

@@ -13,19 +13,19 @@ import (
 
 // Assumes that writes are atomic, even though they aren't.
 // TODO error handling:
-// 1. what should I do if I cannot write a particular log? It seems that I
-// 		must track last valid offset in the log & rewind to that offset on errors,
-//		otherwise a bad write might affect all subsequent ones.
-// 2. the following situation is possible: user tries to write & gets an error
-// 		because of an I/O problem, but the write actually reaches disk. Reads
-//		of the same key return ErrNotFound because the in-memory index wasn't
-//		updated. Later, when DAO is restarted, the key mysteriously appears.
-//		What do people do with this problem? It seems that writes should be
-//		waiting for their WAL commit in some queue. This implies that there
-//		is a total order of all writes. Otherwise the following is possible:
-//		user tries to make a write w1 and fails, then user successfuly makes
-//		write w2, then w1 is finally acknowledged and becomes visible.
-//		Not sure if this should be avoided.
+//  1. what should I do if I cannot write a particular log? It seems that I
+//     must track last valid offset in the log & rewind to that offset on errors,
+//     otherwise a bad write might affect all subsequent ones.
+//  2. the following situation is possible: user tries to write & gets an error
+//     because of an I/O problem, but the write actually reaches disk. Reads
+//     of the same key return ErrNotFound because the in-memory index wasn't
+//     updated. Later, when DAO is restarted, the key mysteriously appears.
+//     What do people do with this problem? It seems that writes should be
+//     waiting for their WAL commit in some queue. This implies that there
+//     is a total order of all writes. Otherwise the following is possible:
+//     user tries to make a write w1 and fails, then user successfuly makes
+//     write w2, then w1 is finally acknowledged and becomes visible.
+//     Not sure if this should be avoided.
 type WALManager struct {
 	config config
 
